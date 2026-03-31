@@ -33,8 +33,6 @@ class DataIngester():
                     break_point1 = content.rfind('\ndef ', start_ptr, tentative_end)
                     break_point2 = content.rfind('\nclass ', start_ptr, tentative_end)
                     actual_end = max(break_point1, break_point2)
-                    if actual_end == -1:
-                        break
                 
                 # if rfind dont find nothing (return -1), we fallback to the tentative end
                 if actual_end <= start_ptr:
@@ -53,6 +51,6 @@ class DataIngester():
 
             yield (chunk_text, source_metadata)
             if actual_end > start_ptr:
-                start_ptr = actual_end - overlap
+                start_ptr = max(actual_end - overlap, start_ptr + 1)
             if start_ptr < 0:
                 start_ptr = 0
