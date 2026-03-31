@@ -1,6 +1,10 @@
-from pydantic import BaseModel, Field
-from typing import List
-import uuid
+try:
+    from pydantic import BaseModel, Field
+    from typing import List
+    import uuid
+except ImportError as e:
+    print(f"Error importing modules: {e}")
+    raise
 
 class MinimalSource(BaseModel):
     file_path: str
