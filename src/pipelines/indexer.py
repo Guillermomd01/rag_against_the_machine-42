@@ -28,6 +28,7 @@ class Indexer:
         return text_clean
 
     def build_index(self, ingester: DataIngester) -> None:
+        """Builds the index by processing the ingested data."""
         for path, content, suffix in ingester.search_files():
             for chunk_text, metadata in ingester.chuncker(path, content, suffix):
                 self.list_minimal_sources.append(metadata)
@@ -44,12 +45,15 @@ class Indexer:
                 self.chuncks_processed += 1
 
     def calculate_idf(self) -> None:
+        """Calculates the Inverse Document Frequency (IDF)
+        for each word in the global document frequency."""
         for word in self.global_df.keys():
             df = self.global_df.get(word, 0)
             idf = math.log(self.chuncks_processed / (1 + df))
             self.global_df[word] = idf
     
     def generate_vector(self) -> List[dict[str, float]]:
+        """Generates the vector representation for each chunk using TF-IDF."""
         self.calculate_idf()
         for chunk_tf in self.all_chunks_tfs:
             vector = {word: tf * self.global_df[word] for word, tf in chunk_tf.items()}
@@ -57,6 +61,7 @@ class Indexer:
         return self.chunk_vectors
     
     def save_index(self) -> None:
+        """Saves the generated index to disk."""
         os.makedirs('data/processed', exist_ok=True)
         with open('data/processed/index_vector.json', 'w') as f:
             json.dump(self.chunk_vectors, f)
