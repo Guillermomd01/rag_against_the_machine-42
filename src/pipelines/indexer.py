@@ -1,9 +1,11 @@
+import os
 import string
 import nltk
 from typing import List
 from nltk.corpus import stopwords
 from src.pipelines.ingester import DataIngester
 import math
+import json
 class Indexer:
     def __init__(self, chunk_size: int):
         self.chunk_size = chunk_size
@@ -32,27 +34,32 @@ class Indexer:
                 normalized_text = self.normalizer(chunk_text)
                 for word in normalized_text:
                     self.local_tf[word] = self.local_tf.get(word, 0) + 1
-                    
+                for word in set(normalized_text):
+                    if word not in self.global_df:
+                        self.global_df[word] = 1
+                    else:
+                        self.global_df[word] += 1
                 self.all_chunks_tfs.append(self.local_tf)
                 self.local_tf = {}
                 self.chuncks_processed += 1
-                
-                
-    #def process_chuncks(self, chunks: DataIngester) -> None:
-    #    text, metadata = chunks.chuncker()
-    #    normalized_text = self.normalizer(text)
-    #    for word in normalized_text:
-    #        self.dict_tf[word] = self.dict_tf.get(word, 0) + 1
-    #    self.list_minimal_sources.append(metadata)
-    #    self.chuncks_processed += 1
 
     def calculate_idf(self) -> None:
-        for word in self.dict_tf.keys():
-            df = self.dict_df.get(word, 0)
+        for word in self.global_df.keys():
+            df = self.global_df.get(word, 0)
             idf = math.log(self.chuncks_processed / (1 + df))
-            self.dict_df[word] = idf
+            self.global_df[word] = idf
     
-    def generate_vector(self) -> dict[str, float]:
+    def generate_vector(self) -> List[dict[str, float]]:
         self.calculate_idf()
-        vector = {word: tf * self.dict_df[word] for word, tf in self.dict_tf.items()}
-        return vector
+        for chunk_tf in self.all_chunks_tfs:
+            vector = {word: tf * self.global_df[word] for word, tf in chunk_tf.items()}
+            self.chunk_vectors.append(vector)
+        return self.chunk_vectors
+    
+    def save_index(self) -> None:
+        os.makedirs('data/processed', exist_ok=True)
+        with open('data/processed/index_vector.json', 'w') as f:
+            json.dump(self.chunk_vectors, f)
+        with open('data/processed/index_metadata.json', 'w') as f:
+            dict_minimal_sources = [source.model_dump() for source in self.list_minimal_sources]
+            json.dump(dict_minimal_sources, f)
