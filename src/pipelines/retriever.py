@@ -2,7 +2,8 @@
 from typing import List
 from src.models.schema import MinimalSource
 from src.pipelines.indexer import Indexer
-import numpy as np
+
+
 class Retriever():
     def __init__(self):
         pass
