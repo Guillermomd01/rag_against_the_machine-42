@@ -68,3 +68,5 @@ class Indexer:
         with open('data/processed/index_metadata.json', 'w') as f:
             dict_minimal_sources = [source.model_dump() for source in self.list_minimal_sources]
             json.dump(dict_minimal_sources, f)
+        with open('data/processed/index_global_df.json', 'w') as f:
+            json.dump(self.global_df, f)
