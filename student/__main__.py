@@ -8,8 +8,10 @@ from src.pipelines.ingester import DataIngester
 from src.pipelines.indexer import Indexer
 from src.pipelines.retriever import Retriever
 from src.pipelines.generator import AnswerGenerator
+from src.pipelines.evaluator import Evaluator
 from src.models.schema import MinimalSearchResults, StudentSearchResults
 from src.models.schema import MinimalAnswer, StudentAnswerResults
+
 import json
 
 class RAGCLI:
@@ -191,9 +193,22 @@ class RAGCLI:
             
         print(f"\n¡Answers generated: {save_path}")
         
-    def evaluate(self, student_answer_path: str, dataset_path: str, k: int = 10):
+    def evaluate(self, student_answer_path: str, dataset_path: str, k: int = 5, save_directory: str = "data/output/evaluation"):
         """Evalúa los resultados contra el ground truth."""
-        pass
+        print(f"Evaluando respuestas de:\n - Predicciones: {student_answer_path}\n - Ground Truth: {dataset_path}")
+                
+        evaluator = Evaluator()
+        
+        metrics_dict = evaluator.evaluate(student_answer_path, dataset_path, k)
+        
+        os.makedirs(save_directory, exist_ok=True)
+        filename = "metrics_" + Path(student_answer_path).name
+        save_path = os.path.join(save_directory, filename)
+        
+        with open(save_path, 'w', encoding='utf-8') as f:
+            json.dump(metrics_dict, f, indent=4, ensure_ascii=False)
+            
+        print(f"\nMetrics saved: {save_path}")
 
 if __name__ == '__main__':
     fire.Fire(RAGCLI)
