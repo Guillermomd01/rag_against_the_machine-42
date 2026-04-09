@@ -63,10 +63,19 @@ class Indexer:
     def save_index(self) -> None:
         """Saves the generated index to disk."""
         os.makedirs('data/processed', exist_ok=True)
-        with open('data/processed/index_vector.json', 'w') as f:
-            json.dump(self.chunk_vectors, f)
-        with open('data/processed/index_metadata.json', 'w') as f:
-            dict_minimal_sources = [source.model_dump() for source in self.list_minimal_sources]
-            json.dump(dict_minimal_sources, f)
-        with open('data/processed/index_global_df.json', 'w') as f:
-            json.dump(self.global_df, f)
+        try:
+            with open('data/processed/index_vector.json', 'w') as f:
+                json.dump(self.chunk_vectors, f)
+        except Exception as e:
+            print(f"Error saving index vector: {e}")
+        try:
+            with open('data/processed/index_metadata.json', 'w') as f:
+                dict_minimal_sources = [source.model_dump() for source in self.list_minimal_sources]
+                json.dump(dict_minimal_sources, f)
+        except Exception as e:
+            print(f"Error saving index metadata: {e}")
+        try:
+            with open('data/processed/index_global_df.json', 'w') as f:
+                json.dump(self.global_df, f)
+        except Exception as e:
+            print(f"Error saving index global df: {e}")

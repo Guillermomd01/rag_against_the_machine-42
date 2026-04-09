@@ -5,12 +5,25 @@ class Evaluator:
     """Clase encargada de evaluar las predicciones de búsqueda y generación."""
 
     def evaluate(self, predictions_path: str, ground_truth_path: str, k: int) -> Dict[str, Any]:
-        # 1. Cargar datos
-        with open(predictions_path, 'r', encoding='utf-8') as f:
-            predictions_data = json.load(f)
-            
-        with open(ground_truth_path, 'r', encoding='utf-8') as f:
-            ground_truth_data = json.load(f)
+        try:
+            with open(predictions_path, 'r', encoding='utf-8') as f:
+                predictions_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: File not found - {predictions_path}")
+            return {}
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON in file - {predictions_path}")
+            return {}
+
+        try:
+            with open(ground_truth_path, 'r', encoding='utf-8') as f:
+                ground_truth_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: File not found - {ground_truth_path}")
+            return {}
+        except json.JSONDecodeError:
+            print(f"Error: Invalid JSON in file - {ground_truth_path}")
+            return {}
 
         if 'search_results' in predictions_data:
             predictions_list = predictions_data['search_results']
