@@ -10,7 +10,7 @@ from src.pipelines.retriever import Retriever
 from src.pipelines.generator import AnswerGenerator
 from src.pipelines.evaluator import Evaluator
 from src.models.schema import MinimalSearchResults, StudentSearchResults
-from src.models.schema import MinimalAnswer, StudentAnswerResults
+from src.models.schema import MinimalAnswer, StudentSearchResultsAndAnswer
 
 import json
 
@@ -50,18 +50,28 @@ class RAGCLI:
             save_dir = "data/output/single_queries/search"
             os.makedirs(save_dir, exist_ok=True)
             path = os.path.join(save_dir, save_path)
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(json_output)
-            print(f"\n¡Result saved: {path}!")
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(json_output)
+                print(f"\n¡Result saved: {path}!")
+            except Exception as e:
+                print(f"Error saving result: {e}")
         else:
             print("\n" + json_output)
 
-    def search_dataset(self, dataset_path: str, k: int = 5, save_directory: str = "data/output/datasets/search"):
+    def search_dataset(self, dataset_path: str, k: int = 5, save_directory: str = "data/output/search"):
         """Procesa múltiples preguntas y exporta los resultados."""
         print(f"Processing dataset: {dataset_path}...")
-        with open(dataset_path, 'r', encoding='utf-8') as f:
-            dataset = json.load(f)
-        
+        try:
+            with open(dataset_path, 'r', encoding='utf-8') as f:
+                dataset = json.load(f)
+        except FileNotFoundError as e:
+            print(f"Error loading dataset: {e}")
+            return
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON: {e}")
+            return
+
         indexer = Indexer(chunk_size=2000)
         metadata = json.load(open('data/processed/index_metadata.json'))
         indexer.list_minimal_sources = [MinimalSource.model_validate(source) for source in metadata]
@@ -98,21 +108,36 @@ class RAGCLI:
         print(f"Looking for context for: '{query}'...")
         
         indexer = Indexer(chunk_size=2000)
-        metadata = json.load(open('data/processed/index_metadata.json'))
+        try:
+            metadata = json.load(open('data/processed/index_metadata.json'))
+        except FileNotFoundError as e:
+            print(f"Error loading index metadata: {e}")
+            return
         indexer.list_minimal_sources = [MinimalSource.model_validate(source) for source in metadata]
-        indexer.global_df = json.load(open('data/processed/index_global_df.json'))
-        indexer.chunk_vectors = json.load(open('data/processed/index_vector.json'))
-        
+        try:
+            indexer.global_df = json.load(open('data/processed/index_global_df.json'))
+        except FileNotFoundError as e:
+            print(f"Error loading index global_df: {e}")
+            return
+        try:
+            indexer.chunk_vectors = json.load(open('data/processed/index_vector.json'))
+        except FileNotFoundError as e:
+            print(f"Error loading index vector: {e}")
+            return
+
         retriever = Retriever()
         retrieved_sources = retriever.retrieve(query, indexer, k)
         
         context_texts = []
         for source in retrieved_sources:
-            with open(source.file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                chunk_text = content[source.first_character_index : source.last_character_index]
-                context_texts.append(chunk_text)
-
+            try:
+                with open(source.file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    chunk_text = content[source.first_character_index : source.last_character_index]
+                    context_texts.append(chunk_text)
+            except FileNotFoundError as e:
+                print(f"Error loading file: {e}")
+                return
         with tqdm(total=1, desc="Downloading model", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}") as pbar:
             generator = AnswerGenerator()
             pbar.update(1)
@@ -127,7 +152,7 @@ class RAGCLI:
             answer=answer_text
         )
         
-        student_results = StudentAnswerResults(answer_results=[mini_answer], k=k)        
+        student_results = StudentSearchResultsAndAnswer(search_results=[mini_answer])        
         json_output = student_results.model_dump_json(indent=4)
         
         if save_path:
@@ -143,10 +168,16 @@ class RAGCLI:
     def answer_dataset(self, student_search_results_path: str, save_directory: str = "data/output/datasets/answer"):
         """Genera respuestas a partir de resultados de búsqueda previos."""
         print(f"Generating answers for results in: {student_search_results_path}...")
-        
-        with open(student_search_results_path, 'r', encoding='utf-8') as f:
-            search_data = json.load(f)
-            
+        try:
+            with open(student_search_results_path, 'r', encoding='utf-8') as f:
+                search_data = json.load(f)
+        except FileNotFoundError as e:
+            print(f"Error loading search results: {e}")
+            return
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON: {e}")
+            return
+
         results_list = search_data.get('search_results', [])
         k = search_data.get('k', 10)
         
@@ -155,6 +186,8 @@ class RAGCLI:
             pbar.update(1)
 
         all_answers = []
+        file_cache = {}  # OPTIMIZACIÓN 1: Caché de archivos para no leer el disco 1000 veces
+        
         for item in tqdm(results_list, desc="Generating answers"):
             question_id = item['question_id']
             query = item['question']
@@ -163,36 +196,50 @@ class RAGCLI:
             context_texts = []
             retrieved_sources_objs = []
             
-            for source_dict in sources_dicts:
+            # OPTIMIZACIÓN 2: Le pasamos solo los 3 primeros chunks al LLM en lugar de los 10.
+            # (El evaluador seguirá teniendo los 10 en la lista para medir el recall)
+            for source_dict in sources_dicts[:3]: 
                 source_obj = MinimalSource(**source_dict)
                 retrieved_sources_objs.append(source_obj)
                 
-                with open(source_obj.file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    chunk_text = content[source_obj.first_character_index : source_obj.last_character_index]
-                    context_texts.append(chunk_text)
+                file_path = source_obj.file_path
+                # Si no hemos leído este archivo aún, lo leemos y lo guardamos en RAM
+                if file_path not in file_cache:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            file_cache[file_path] = f.read()
+                    except Exception as e:
+                        print(f"Error reading {file_path}: {e}")
+                        continue
+                        
+                content = file_cache[file_path]
+                chunk_text = content[source_obj.first_character_index : source_obj.last_character_index]
+                context_texts.append(chunk_text)
                     
             answer_text = generator.generate_answer(query, context_texts)
             
+            # Guardamos todos los sources originales (sources_dicts) para no arruinar el Recall@10
             mini_answer = MinimalAnswer(
                 question_id=question_id,
                 question=query,
-                retrieved_sources=retrieved_sources_objs,
+                retrieved_sources=[MinimalSource(**s) for s in sources_dicts], 
                 answer=answer_text
             )
             all_answers.append(mini_answer)
             
-        student_answers = StudentAnswerResults(answer_results=all_answers, k=k)
+        student_answers = StudentSearchResultsAndAnswer(search_results=[mini_answer])
         
         os.makedirs(save_directory, exist_ok=True)
         filename = Path(student_search_results_path).name 
         save_path = os.path.join(save_directory, filename)
-        
-        with open(save_path, 'w', encoding='utf-8') as f:
-            f.write(student_answers.model_dump_json(indent=4))
-            
-        print(f"\n¡Answers generated: {save_path}")
-        
+        try:
+            with open(save_path, 'w', encoding='utf-8') as f:
+                f.write(student_answers.model_dump_json(indent=4))
+            print(f"\n¡Answers generated: {save_path}")
+        except Exception as e:
+            print(f"Error saving answers: {e}")
+            return
+
     def evaluate(self, student_answer_path: str, dataset_path: str, k: int = 5, save_directory: str = "data/output/evaluation"):
         """Evalúa los resultados contra el ground truth."""
         print(f"Evaluando respuestas de:\n - Predicciones: {student_answer_path}\n - Ground Truth: {dataset_path}")
@@ -204,11 +251,13 @@ class RAGCLI:
         os.makedirs(save_directory, exist_ok=True)
         filename = "metrics_" + Path(student_answer_path).name
         save_path = os.path.join(save_directory, filename)
-        
-        with open(save_path, 'w', encoding='utf-8') as f:
-            json.dump(metrics_dict, f, indent=4, ensure_ascii=False)
-            
-        print(f"\nMetrics saved: {save_path}")
+        try:
+            with open(save_path, 'w', encoding='utf-8') as f:
+                json.dump(metrics_dict, f, indent=4, ensure_ascii=False)
+            print(f"\nMetrics saved: {save_path}")
+        except Exception as e:
+            print(f"Error saving metrics: {e}")
+            return
 
 if __name__ == '__main__':
     fire.Fire(RAGCLI)
