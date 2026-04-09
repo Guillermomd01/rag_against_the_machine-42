@@ -1,4 +1,3 @@
-# RAG Against the Machine - Makefile
 
 VENV = .venv
 UV = uv
@@ -30,13 +29,13 @@ clean:
 
 lint:
 	@echo "$(GREEN)Ejecutando linters (flake8 y mypy)...$(NC)"
-	$(UV) run flake8 .
-	$(UV) run mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	$(UV) run flake8 src
+	$(UV) run mypy src --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
 
 lint-strict:
 	@echo "$(GREEN)Ejecutando linters en modo estricto...$(NC)"
-	$(UV) run flake8 .
-	$(UV) run mypy . --strict
+	$(UV) run flake8 src
+	$(UV) run mypy src --strict
 
 fclean: clean
 	@echo "$(GREEN)Borrando el entorno virtual...$(NC)"
