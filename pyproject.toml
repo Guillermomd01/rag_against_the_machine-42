@@ -15,7 +15,7 @@ dependencies = [
     "fire>=0.7.1",
     "pydantic>=2.12.5",
     "tqdm>=4.67.3",
-    "numpy>=2.0.0"
+    "numpy>=2.0.0",
     "flake8>=7.0.0",
     "mypy>=1.9.0"
 ]
