@@ -218,7 +218,7 @@ class RAGCLI:
                     
             answer_text = generator.generate_answer(query, context_texts)
             
-            # Guardamos todos los sources originales (sources_dicts) para no arruinar el Recall@10
+            # Guardamos todos los sources originales...
             mini_answer = MinimalAnswer(
                 question_id=question_id,
                 question=query,
@@ -227,7 +227,8 @@ class RAGCLI:
             )
             all_answers.append(mini_answer)
             
-        student_answers = StudentSearchResultsAndAnswer(search_results=[mini_answer])
+        # CORRECCIÓN: Le pasamos la lista entera de respuestas
+        student_answers = StudentSearchResultsAndAnswer(search_results=all_answers, k =k)
         
         os.makedirs(save_directory, exist_ok=True)
         filename = Path(student_search_results_path).name 
@@ -247,7 +248,9 @@ class RAGCLI:
         evaluator = Evaluator()
         
         metrics_dict = evaluator.evaluate(student_answer_path, dataset_path, k)
-        
+        if not metrics_dict:
+            print("\n[Error] Evaluación abortada: No se encontraron métricas válidas.")
+            return        
         os.makedirs(save_directory, exist_ok=True)
         filename = "metrics_" + Path(student_answer_path).name
         save_path = os.path.join(save_directory, filename)
