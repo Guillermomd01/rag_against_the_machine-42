@@ -5,20 +5,25 @@ class AnswerGenerator:
     def __init__(self, model_name: str = "Qwen/Qwen2.5-0.5B"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         
-        print("\n[Info] Cargando modelo con Accelerate (device_map='auto')...")
+        # 1. Detección explícita de hardware (¡Vital para los Mac de 42!)
+        if torch.backends.mps.is_available():
+            self.device = torch.device("mps")
+        elif torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
+            print("[Warning] No se detectó GPU/MPS. Se usará la CPU (muy lento).")
+            
+        print(f"\n[Info] Cargando modelo en dispositivo: {str(self.device).upper()}...")
         
-        # Accelerate se encarga de todo: busca tu GPU o CPU y lo optimiza.
-        # torch_dtype=torch.float16 reduce el consumo de RAM a la mitad y duplica la velocidad.
+        # 2. Cargamos el modelo y lo enviamos al hardware correcto directamente
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            device_map="auto",
             torch_dtype=torch.float16
-        )
+        ).to(self.device)
 
-    # Desactivamos el motor de entrenamiento de PyTorch
     @torch.inference_mode() 
     def generate_answer(self, query: str, context_chunks: list[str]) -> str:
-        # Mantenemos un límite sano para no desbordar la memoria (VRAM/RAM)
         context_str = '\n'.join(context_chunks)
         max_context_length = 3500 
         if len(context_str) > max_context_length:
@@ -32,8 +37,8 @@ Question:
 {query}
 Answer:"""
         
-        # .to(self.model.device) es vital aquí para enviar el texto al mismo hardware que eligió Accelerate
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        # 3. Enviamos los tensores de entrada al mismo device que el modelo
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         
         outputs = self.model.generate(
             **inputs, 
