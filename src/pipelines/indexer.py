@@ -2,6 +2,7 @@ import os
 import string
 import nltk
 from typing import List
+import re
 from nltk.corpus import stopwords
 from src.pipelines.ingester import DataIngester
 from src.models.schema import MinimalSource
@@ -10,7 +11,11 @@ import json
 
 
 class Indexer:
+    """Class responsible for building the index from ingested
+    data and generating vector representations for chunks."""
     def __init__(self, chunk_size: int):
+        """Initializes the Indexer with the specified
+        chunk size and sets up necessary data structures."""
         self.chunk_size = chunk_size
         nltk.download('stopwords')
         self.stop_words = set(stopwords.words('english'))
@@ -21,7 +26,7 @@ class Indexer:
         self.chunk_vectors: List[dict[str, float]] = []
         self.chuncks_processed: int = 0
 
-    def normalizer(self, text: str) -> List[str]:
+    def normalize_docs(self, text: str) -> List[str]:
         """Normalizes the input text by removing punctuation,
         converting to lowercase, and removing stop words."""
         table = str.maketrans('', '', string.punctuation + "¡¿")
@@ -31,13 +36,26 @@ class Indexer:
                       if word not in self.stop_words]
         return text_clean
 
+    def normalize_code(self, text: str) -> List[str]:
+        """Normalizes code by extracting alphanumeric tokens and
+        removing stop words."""
+        tokens = re.findall(r'[a-zA-Z0-9_]+', text.lower())
+        return [word for word in tokens if word not in self.stop_words]
+
+    def normalizer(self, text: str, is_code: bool = False) -> List[str]:
+        """Decide qué normalizador usar."""
+        if is_code:
+            return self.normalize_code(text)
+        return self.normalize_docs(text)
+
     def build_index(self, ingester: DataIngester) -> None:
         """Builds the index by processing the ingested data."""
         for path, content, suffix in ingester.search_files():
             for chunk_text, metadata in ingester.chuncker(
                     path, content, suffix):
                 self.list_minimal_sources.append(metadata)
-                normalized_text = self.normalizer(chunk_text)
+                is_cod = not path.endswith(('.md', '.rst', '.txt'))
+                normalized_text = self.normalizer(chunk_text, is_code = is_cod)
                 for word in normalized_text:
                     self.local_tf[word] = self.local_tf.get(word, 0) + 1
                 for word in set(normalized_text):

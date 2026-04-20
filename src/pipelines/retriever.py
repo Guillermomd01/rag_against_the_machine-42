@@ -2,9 +2,12 @@
 from typing import List
 from src.models.schema import MinimalSource
 from src.pipelines.indexer import Indexer
+import math
 
 
 class Retriever():
+    """Class responsible for
+    retrieving relevant chunks based on a query."""
     def __init__(self) -> None:
         pass
 
@@ -22,11 +25,13 @@ class Retriever():
         self, query: str,
             indexer: Indexer) -> dict[str, float]:
         """Vectorizes the query using the same TF-IDF approach as the index."""
-        query_normalized = indexer.normalizer(query)
+        query_docs = indexer.normalize_docs(query)
+        query_code = indexer.normalize_code(query)
+        query_normalized = list(set(query_docs + query_code))
         query_tf: dict[str, float] = {}
         for word in query_normalized:
             query_tf[word] = query_tf.get(word, 0.0) + 1.0
-        query_vector = {word: tf * indexer.global_df.get(word, 0)
+        query_vector = {word: tf * indexer.global_df.get(word, 0.0)
                         for word, tf in query_tf.items()}
         return query_vector
 
