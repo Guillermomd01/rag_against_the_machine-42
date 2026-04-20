@@ -17,14 +17,19 @@ import json
 class RAGCLI:
     """Command Line Interface"""
 
-    def index(self, max_chunk_size: int = 2000) -> None:
+    def index(self, max_chunk_size: int = 1000) -> None:
         """Index the documents in data/raw and save
         the indices in data/processed."""
         print(f"Starting indexing with chunks of {max_chunk_size}...")
+        print("Ingesting and chunking data...")
         ingester = DataIngester(data_dir="data/raw")
+        print("Initializing indexer...")
         indexer = Indexer(chunk_size=max_chunk_size)
+        print("Building index...")
         indexer.build_index(ingester)
+        print("Generating vectors...")
         indexer.generate_vector()
+        print("Saving index...")
         indexer.save_index()
         print("Ingestion complete! Indices saved under data/processed/")
 
