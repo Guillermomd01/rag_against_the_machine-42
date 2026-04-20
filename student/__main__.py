@@ -15,11 +15,12 @@ import json
 
 
 class RAGCLI:
-    """Command Line Interface."""
+    """Command Line Interface"""
 
     def index(self, max_chunk_size: int = 2000) -> None:
-        """Indexa el repositorio."""
-        print(f"Iniciando indexación con chunks de {max_chunk_size}...")
+        """Index the documents in data/raw and save
+        the indices in data/processed."""
+        print(f"Starting indexing with chunks of {max_chunk_size}...")
         ingester = DataIngester(data_dir="data/raw")
         indexer = Indexer(chunk_size=max_chunk_size)
         indexer.build_index(ingester)
@@ -30,7 +31,8 @@ class RAGCLI:
     def search(
         self, query: str, k: int = 5,
             save_path: str | None = None) -> None:
-        """Busca una única query."""
+        """Search for relevant chunks given a query
+        and return the top k results."""
         print(f"Looking for {k} best results for: '{query}'")
         indexer = Indexer(chunk_size=2000)
         metadata = json.load(open('data/processed/index_metadata.json'))
@@ -68,7 +70,8 @@ class RAGCLI:
     def search_dataset(
         self, dataset_path: str, k: int = 5,
             save_directory: str = "data/output/search") -> None:
-        """Procesa múltiples preguntas y exporta los resultados."""
+        """Process a dataset of questions and
+        save the search results."""
         print(f"Processing dataset: {dataset_path}...")
         try:
             with open(dataset_path, 'r', encoding='utf-8') as f:
@@ -119,7 +122,8 @@ class RAGCLI:
     def answer(
         self, query: str, k: int = 10,
             save_path: str | None = None) -> None:
-        """Responde a una pregunta usando contexto."""
+        """Answer a single question by retrieving
+        relevant chunks and generating an answer."""
         print(f"Looking for context for: '{query}'...")
 
         indexer = Indexer(chunk_size=2000)
@@ -191,7 +195,7 @@ class RAGCLI:
     def answer_dataset(
         self, student_search_results_path: str,
             save_directory: str = "data/output/datasets/answer") -> None:
-        """Genera respuestas a partir de resultados de búsqueda previos."""
+        """Generate answers for a dataset of search results."""
         print(f"Generating answers for results in:"
               f" {student_search_results_path}...")
         try:
@@ -269,16 +273,17 @@ class RAGCLI:
         self, student_answer_path: str,
             dataset_path: str, k: int = 5,
             save_directory: str = "data/output/evaluation") -> None:
-        """Evalúa los resultados contra el ground truth."""
-        print(f"Evaluando respuestas de:\n"
-              f"- Predicciones: {student_answer_path}\n -"
+        """Evaluate the search dataset results against the ground truth
+        and save the metrics."""
+        print(f"Evaluating:\n"
+              f"- Predictions: {student_answer_path}\n -"
               f"Ground Truth: {dataset_path}")
         evaluator = Evaluator()
 
         metrics_dict = evaluator.evaluate(student_answer_path, dataset_path, k)
         if not metrics_dict:
-            print("\n[Error] Evaluación abortada:"
-                  "No se encontraron métricas válidas.")
+            print("\n[Error] Evaluation failed:"
+                  "No valid metrics found.")
             return
         os.makedirs(save_directory, exist_ok=True)
         filename = "metrics_" + Path(student_answer_path).name
