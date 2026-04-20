@@ -26,6 +26,8 @@ class DataIngester():
         self, path_file: str, content: str, suffix: str,
             max_chars: int = 2000,
             overlap: int = 200) -> Iterator[Tuple[str, MinimalSource]]:
+        """Splits the content into chunks of a specifiedmaximum
+        character length,with a specified overlap between chunks."""
         start_ptr = 0
         total_len = len(content)
 
