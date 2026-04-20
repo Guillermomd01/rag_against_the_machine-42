@@ -3,11 +3,14 @@ from typing import Dict, Any
 
 
 class Evaluator:
-    """Clase encargada de evaluar las predicciones de búsqueda y generación."""
+    """Class responsible for evaluating the performance
+    of the retrieval and answer generation components."""
 
     def evaluate(
         self, predictions_path: str,
             ground_truth_path: str, k: int) -> Dict[str, Any]:
+        """Evaluates the predictions against the ground truth data
+        and calculates metrics such as recall@k."""
         try:
             with open(predictions_path, 'r', encoding='utf-8') as f:
                 predictions_data = json.load(f)

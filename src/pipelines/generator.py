@@ -4,9 +4,12 @@ import torch
 
 class AnswerGenerator:
     def __init__(self, model_name: str = "Qwen/Qwen2.5-0.5B"):
+        """Initializes the AnswerGenerator by loading the
+        specified model and tokenizer, and setting up the
+        device for inference."""
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        # 1. Detección explícita de hardware (¡Vital para los Mac de 42!)
+        # Detect the best available device (GPU/MPS/CPU)
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
         elif torch.cuda.is_available():
@@ -16,10 +19,10 @@ class AnswerGenerator:
             print("[Warning] No se detectó GPU/MPS."
                   "Se usará la CPU.")
 
-        print(f"\n[Info] Cargando modelo en dispositivo:"
+        print(f"\n[Info] Loading model on device:"
               f" {str(self.device).upper()}...")
 
-        # 2. Cargamos el modelo y lo enviamos al hardware correcto directamente
+        # Loading the model with the detected device
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=torch.float16
@@ -39,7 +42,7 @@ class AnswerGenerator:
         Context: {context_str}
         Question: {query} Answer:"""
 
-        # 3. Enviamos los tensores de entrada al mismo device que el modelo
+        # tensorize the prompt and move it to the same device as the model
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
 
         outputs = self.model.generate(
