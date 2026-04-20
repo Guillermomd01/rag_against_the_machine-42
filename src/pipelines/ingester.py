@@ -12,8 +12,11 @@ class DataIngester():
     def search_files(self) -> Iterator[Tuple[str, str, str]]:
         """Searches for .py and .md files in
         the specified directory and reads their content."""
+        valid_extensions = {
+            '.md', '.rst', '.txt', '.py', '.cpp',
+                '.cu', '.cuh', '.h', '.hpp', '.c'}
         for file in self.data_dir.rglob('*'):
-            if file.is_file() and file.suffix in ['.py', '.md']:
+            if file.is_file() and file.suffix.lower() in valid_extensions or file.name == 'README':
                 try:
                     with open(file, 'r', encoding='utf-8') as f:
                         path_file = str(file)
@@ -25,7 +28,7 @@ class DataIngester():
     def chuncker(
         self, path_file: str, content: str, suffix: str,
             max_chars: int = 2000,
-            overlap: int = 200) -> Iterator[Tuple[str, MinimalSource]]:
+            overlap: int = 250) -> Iterator[Tuple[str, MinimalSource]]:
         """Splits the content into chunks of a specifiedmaximum
         character length,with a specified overlap between chunks."""
         start_ptr = 0
@@ -35,10 +38,11 @@ class DataIngester():
             tentative_end = min(start_ptr + max_chars, total_len)
 
             if tentative_end < total_len:
-                if suffix == ".md":
+                actual_end = -1
+                if suffix in ['.md', '.rst', '.txt']:
                     actual_end = content.rfind(
                         '\n\n', start_ptr, tentative_end)
-                elif suffix == ".py":
+                elif suffix in [".py", ".cpp", ".cu", ".cuh", ".h", ".hpp", ".c"]:
 
                     break_point1 = content.rfind(
                         '\ndef ', start_ptr, tentative_end)
