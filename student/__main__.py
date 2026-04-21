@@ -52,7 +52,7 @@ class RAGCLI:
 
         mini_search_results = [MinimalSearchResults(
             question_id=str(uuid.uuid4()),
-            question=query,
+            question_str=query,
             retrieved_sources=results
         )]
         student_results = StudentSearchResults(
@@ -73,7 +73,7 @@ class RAGCLI:
             print("\n" + json_output)
 
     def search_dataset(
-        self, dataset_path: str, k: int = 5,
+        self, dataset_path: str, k: int = 10,
             save_directory: str = "data/output/search") -> None:
         """Process a dataset of questions and
         save the search results."""
@@ -108,7 +108,7 @@ class RAGCLI:
             results = retriever.retrieve(query, indexer, k)
             mini_result = MinimalSearchResults(
                 question_id=question_id,
-                question=query,
+                question_str=query,
                 retrieved_sources=results
             )
             all_mini_results.append(mini_result)
@@ -178,7 +178,7 @@ class RAGCLI:
 
         mini_answer = MinimalAnswer(
             question_id=str(uuid.uuid4()),
-            question=query,
+            question_str=query,
             retrieved_sources=retrieved_sources,
             answer=answer_text
         )
@@ -254,7 +254,7 @@ class RAGCLI:
 
             mini_answer = MinimalAnswer(
                 question_id=question_id,
-                question=query,
+                question_Str=query,
                 retrieved_sources=[MinimalSource(**s) for s in sources_dicts],
                 answer=answer_text
             )
