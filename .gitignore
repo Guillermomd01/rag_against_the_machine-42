@@ -2,3 +2,5 @@ __pycache__/
 venv/
 data/
 src/rag_against_the_machine.egg-info
+uv.lock
+moulinette-ubuntu
