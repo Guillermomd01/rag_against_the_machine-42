@@ -3,13 +3,13 @@ import torch
 
 
 class AnswerGenerator:
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-0.5B"):
+    def __init__(self, model_name: str = "Qwen/Qwen3-0.6B"):
         """Initializes the AnswerGenerator by loading the
         specified model and tokenizer, and setting up the
         device for inference."""
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-        # Detect the best available device (GPU/MPS/CPU)
+        # Detect the best available device
         if torch.backends.mps.is_available():
             self.device = torch.device("mps")
         elif torch.cuda.is_available():

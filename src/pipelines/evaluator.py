@@ -66,9 +66,27 @@ class Evaluator:
             hits = 0
             for gt_source in gt_sources:
                 gt_file = gt_source.get('file_path')
-                if any(p_source.get('file_path') == gt_file
-                       for p_source in pred_sources):
-                    hits += 1
+                gt_start = gt_source.get('first_character_index', 0)
+                gt_end = gt_source.get('last_character_index', 0)
+
+                for p_source in pred_sources:
+                    if p_source.get('file_path') != gt_file:
+                        continue
+
+                    pred_start = p_source.get('first_character_index', 0)
+                    pred_end = p_source.get('last_character_index', 0)
+
+                    overlap_start = max(gt_start, pred_start)
+                    overlap_end = min(gt_end, pred_end)
+
+                    if overlap_start < overlap_end:
+                        overlap = overlap_end - overlap_start
+                        gt_length = gt_end - gt_start
+                        if gt_length > 0:
+                            overlap_ratio = overlap / gt_length
+                            if overlap_ratio >= 0.05:
+                                hits += 1
+                                break
 
             recall_at_k = (hits / len(gt_sources)) if gt_sources else 0.0
             total_recall += recall_at_k
