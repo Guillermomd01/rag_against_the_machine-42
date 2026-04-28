@@ -14,11 +14,11 @@ install:
 
 run:
 	@echo "$(GREEN)Running the main CLI...$(NC)"
-	$(UV) run python -m student
+	$(UV) run python -m src
 
 debug:
 	@echo "$(GREEN)Running in debug mode (pdb)...$(NC)"
-	$(UV) run python -m pdb -m student
+	$(UV) run python -m pdb -m src
 
 clean:
 	@echo "$(GREEN)Cleaning temporary files and caches...$(NC)"
@@ -28,8 +28,8 @@ clean:
 
 lint:
 	@echo "$(GREEN)Running linters (flake8 and mypy)...$(NC)"
-	$(UV) run flake8 src student
-	$(UV) run mypy src student --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	$(UV) run flake8 src
+	$(UV) run mypy src --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
 
 
 fclean: clean
