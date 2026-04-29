@@ -1,3 +1,5 @@
+*This project has been created as part of the 42 curriculum by gumunoz.*
+
 # RAG Against The Machine
 
 ## 1. System Architecture
