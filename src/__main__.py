@@ -333,7 +333,6 @@ class RAGCLI:
 
 
 if __name__ == '__main__':
-    # Ensure we run from the project root where data/ is located
     _script_dir = Path(__file__).resolve().parent
     if _script_dir.name == 'student':
         os.chdir(_script_dir.parent)
