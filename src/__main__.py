@@ -28,6 +28,45 @@ def _detect_index_type(dataset_path: str) -> str:
 class RAGCLI:
     """Command Line Interface for the RAG system."""
 
+    def __init__(self) -> None:
+        """Initialize RAGCLI with lazy loading of models and indices."""
+        self._generator: AnswerGenerator | None = None
+        self._indexer: Indexer | None = None
+        self._ingester: DataIngester | None = None
+        self._retriever: Retriever | None = None
+        self._file_cache: dict[str, str] = {}
+
+    def _get_generator(self) -> AnswerGenerator:
+        """Lazy load the AnswerGenerator (singleton pattern)."""
+        if self._generator is None:
+            with tqdm(total=1, desc="Loading model",
+                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}") as pbar:
+                self._generator = AnswerGenerator()
+                pbar.update(1)
+        return self._generator
+
+    def _get_indexer(self) -> Indexer:
+        """Lazy load the Indexer with both indices."""
+        if self._indexer is None:
+            self._indexer = Indexer(chunk_size=2000)
+            if not self._indexer.load_index('docs'):
+                print("Warning: Docs index not found. Run 'index' first.")
+            if not self._indexer.load_index('code'):
+                print("Warning: Code index not found.")
+        return self._indexer
+
+    def _get_ingester(self) -> DataIngester:
+        """Lazy load the DataIngester."""
+        if self._ingester is None:
+            self._ingester = DataIngester(data_dir="data/raw")
+        return self._ingester
+
+    def _get_retriever(self) -> Retriever:
+        """Lazy load the Retriever."""
+        if self._retriever is None:
+            self._retriever = Retriever()
+        return self._retriever
+
     def index(self, max_chunk_size: int = 2000) -> None:
         """Index the documents in data/raw and save
         the indices in data/processed."""
@@ -162,56 +201,73 @@ class RAGCLI:
     def answer(
         self, query: str, k: int = 10,
             save_path: str | None = None) -> None:
-        """Answer a single question by retrieving
-        relevant chunks and generating an answer."""
-        print(f"Looking for context for: '{query}'...")
+        """Answer one or more questions by retrieving
+        relevant chunks and generating answers.
+        For multiple questions, pass them space-separated
+        or call answer multiple times."""
+        # Support multiple queries separated by "|"
+        queries = [q.strip() for q in query.split("|") if q.strip()]
 
-        indexer = Indexer(chunk_size=2000)
-        if not indexer.load_index('docs'):
-            print("Error: Docs index not found. Run 'index' first.")
+        if not queries:
+            print("Error: No valid queries provided.")
             return
-        if not indexer.load_index('code'):
-            print("Warning: Code index not found.")
 
-        ingester = DataIngester(data_dir="data/raw")
-        retriever = Retriever()
+        indexer = self._get_indexer()
+        if indexer.docs_retriever is None and indexer.code_retriever is None:
+            print("Error: No indices loaded. Run 'index' first.")
+            return
 
-        tokens_doc = ingester.normalizer(query, is_code=False)
-        tokens_code = ingester.normalizer(query, is_code=True)
-        query_doc = " ".join(tokens_doc)
-        query_code = " ".join(tokens_code)
-        retrieved_sources = retriever.retrieve_combined(
-            query_doc + " " + query_code, indexer, k)
+        ingester = self._get_ingester()
+        retriever = self._get_retriever()
+        generator = self._get_generator()
 
-        context_texts = []
-        for source in retrieved_sources:
-            try:
-                with open(source.file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    chunk_text = content[
-                        source.first_character_index:
-                            source.last_character_index]
-                    context_texts.append(chunk_text)
-            except FileNotFoundError as e:
-                print(f"Error loading file: {e}")
-                return
-        with tqdm(total=1, desc="Loading model",
-                  bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}") as pbar:
-            generator = AnswerGenerator()
-            pbar.update(1)
+        all_answers = []
 
-        print("\nCreating answer...")
-        answer_text = generator.generate_answer(query, context_texts)
+        for idx, single_query in enumerate(queries, 1):
+            display_query = (single_query[:57] + "..."
+                             if len(single_query) > 60
+                             else single_query)
+            print(f"\n[{idx}/{len(queries)}] Looking for context for: "
+                  f"'{display_query}'")
 
-        mini_answer = MinimalAnswer(
-            question_id=str(uuid.uuid4()),
-            question_str=query,
-            retrieved_sources=retrieved_sources,
-            answer=answer_text
-        )
+            tokens_doc = ingester.normalizer(single_query, is_code=False)
+            tokens_code = ingester.normalizer(single_query, is_code=True)
+            query_doc = " ".join(tokens_doc)
+            query_code = " ".join(tokens_code)
+            retrieved_sources = retriever.retrieve_combined(
+                query_doc + " " + query_code, indexer, k)
+
+            context_texts = []
+            for source in retrieved_sources:
+                file_path = source.file_path
+                if file_path not in self._file_cache:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            self._file_cache[file_path] = f.read()
+                    except FileNotFoundError as e:
+                        print(f"Error loading file: {e}")
+                        return
+
+                content = self._file_cache[file_path]
+                chunk_text = content[
+                    source.first_character_index:
+                        source.last_character_index]
+                context_texts.append(chunk_text)
+
+            print("Creating answer...")
+            answer_text = generator.generate_answer(
+                single_query, context_texts)
+
+            mini_answer = MinimalAnswer(
+                question_id=str(uuid.uuid4()),
+                question_str=single_query,
+                retrieved_sources=retrieved_sources,
+                answer=answer_text
+            )
+            all_answers.append(mini_answer)
 
         student_results = StudentSearchResultsAndAnswer(
-            search_results=[mini_answer], k=k)
+            search_results=all_answers, k=k)
         json_output = student_results.model_dump_json(indent=4)
 
         if save_path:
@@ -244,13 +300,9 @@ class RAGCLI:
         results_list = search_data.get('search_results', [])
         k = search_data.get('k', 10)
 
-        with tqdm(total=1, desc="Loading Qwen",
-                  bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}") as pbar:
-            generator = AnswerGenerator()
-            pbar.update(1)
+        generator = self._get_generator()
 
         all_answers = []
-        file_cache = {}
 
         for item in tqdm(results_list, desc="Generating answers"):
             question_id = item['question_id']
@@ -264,15 +316,15 @@ class RAGCLI:
                 retrieved_sources_objs.append(source_obj)
 
                 file_path = source_obj.file_path
-                if file_path not in file_cache:
+                if file_path not in self._file_cache:
                     try:
                         with open(file_path, 'r', encoding='utf-8') as f:
-                            file_cache[file_path] = f.read()
+                            self._file_cache[file_path] = f.read()
                     except Exception as e:
                         print(f"Error reading {file_path}: {e}")
                         continue
 
-                content = file_cache[file_path]
+                content = self._file_cache[file_path]
                 chunk_text = content[
                     source_obj.first_character_index:
                         source_obj.last_character_index]
