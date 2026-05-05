@@ -1,3 +1,4 @@
+import sys
 import uuid
 from tqdm import tqdm
 import os
@@ -209,12 +210,13 @@ class RAGCLI:
         queries = [q.strip() for q in query.split("|") if q.strip()]
 
         if not queries:
-            print("Error: No valid queries provided.")
+            print("Error: No valid queries provided.", file=sys.stderr)
             return
 
         indexer = self._get_indexer()
         if indexer.docs_retriever is None and indexer.code_retriever is None:
-            print("Error: No indices loaded. Run 'index' first.")
+            print("Error: No indices loaded. Run 'index' first.",
+                  file=sys.stderr)
             return
 
         ingester = self._get_ingester()
@@ -228,7 +230,7 @@ class RAGCLI:
                              if len(single_query) > 60
                              else single_query)
             print(f"\n[{idx}/{len(queries)}] Looking for context for: "
-                  f"'{display_query}'")
+                  f"'{display_query}'", file=sys.stderr)
 
             tokens_doc = ingester.normalizer(single_query, is_code=False)
             tokens_code = ingester.normalizer(single_query, is_code=True)
@@ -245,7 +247,7 @@ class RAGCLI:
                         with open(file_path, 'r', encoding='utf-8') as f:
                             self._file_cache[file_path] = f.read()
                     except FileNotFoundError as e:
-                        print(f"Error loading file: {e}")
+                        print(f"Error loading file: {e}", file=sys.stderr)
                         return
 
                 content = self._file_cache[file_path]
@@ -254,7 +256,7 @@ class RAGCLI:
                         source.last_character_index]
                 context_texts.append(chunk_text)
 
-            print("Creating answer...")
+            print("Creating answer...", file=sys.stderr)
             answer_text = generator.generate_answer(
                 single_query, context_texts)
 
