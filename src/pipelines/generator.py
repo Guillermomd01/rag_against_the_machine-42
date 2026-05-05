@@ -1,3 +1,4 @@
+import sys
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
@@ -17,10 +18,10 @@ class AnswerGenerator:
         else:
             self.device = torch.device("cpu")
             print("[Warning] No se detectó GPU/MPS."
-                  "Se usará la CPU.")
+                  "Se usará la CPU.", file=sys.stderr)
 
         print(f"\n[Info] Loading model on device:"
-              f" {str(self.device).upper()}...")
+              f" {str(self.device).upper()}...", file=sys.stderr)
 
         # Loading the model with the detected device
         self.model = AutoModelForCausalLM.from_pretrained(
